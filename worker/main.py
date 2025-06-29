@@ -57,6 +57,7 @@ def data_cleaner(data: dict) -> dict:
     else:
         return data
 
+
 def process_job(jobs_collection, redis_client, request_id: str):
     """The core logic for processing a single job."""
     print(f"Processing job: {request_id}")
