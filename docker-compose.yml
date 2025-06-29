@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: mongo_db
+    command: mongod --quiet
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-net
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis_queue
+    ports:
+      - "6380:6379"
+    networks:
+      - app-net
+
+  mock_vendors:
+    build:
+      context: ./mock_vendors
+    container_name: mock_vendors_service
+    ports:
+      - "8001:8000"
+    networks:
+      - app-net
+    environment:
+      - API_WEBHOOK_URL=http://api:8000/vendor-webhook/async_vendor
+
+  api:
+    build: .
+    container_name: django_api
+    command: gunicorn multi_vendor_project.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./.env
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - app-net
+
+  worker:
+    build: .
+    container_name: background_worker
+    command: python worker/main.py
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env
+    depends_on:
+      redis:
+        condition: service_started
+      mongo:
+        condition: service_started
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  mongodb_data:

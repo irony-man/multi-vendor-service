@@ -1,0 +1,10 @@
+Django>=4.0
+djangorestframework
+gunicorn
+pymongo
+redis
+httpx
+fastapi # For mock vendor
+uvicorn # For mock vendor
+pydantic
+pre-commit

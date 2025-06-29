@@ -1,0 +1,61 @@
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: load_testing/load_test.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 200 max VUs, 3m0s max duration (incl. graceful stop):
+              * default: Up to 200 looping VUs for 2m30s over 4 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+
+
+
+  █ THRESHOLDS
+
+    http_req_duration{group:::Check Status}
+    ✓ 'p(95)<800' p(95)=29.81ms
+
+    http_req_duration{group:::Submit Job}
+    ✓ 'p(95)<500' p(95)=19.29ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 19605   128.803813/s
+    checks_succeeded...................: 100.00% 19605 out of 19605
+    checks_failed......................: 0.00%   0 out of 19605
+
+    ✓ POST /jobs responded with 202
+    ✓ GET /jobs/{id} responded with 200
+    ✓ GET /jobs/{id} has a valid status
+
+    HTTP
+    http_req_duration.......................................................: avg=12.99ms min=4.51ms med=11.25ms max=122.73ms p(90)=20.74ms p(95)=26.75ms
+      { expected_response:true }............................................: avg=12.99ms min=4.51ms med=11.25ms max=122.73ms p(90)=20.74ms p(95)=26.75ms
+      { group:::Check Status }..............................................: avg=16.81ms min=8.04ms med=14.71ms max=122.73ms p(90)=24.02ms p(95)=29.81ms
+      { group:::Submit Job }................................................: avg=9.17ms  min=4.51ms med=7.1ms   max=120.72ms p(90)=14.19ms p(95)=19.29ms
+    http_req_failed.........................................................: 0.00%  0 out of 13070
+    http_reqs...............................................................: 13070  85.869209/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=3.02s   min=3.01s  med=3.02s   max=3.14s    p(90)=3.04s   p(95)=3.04s
+    iterations..............................................................: 6535   42.934604/s
+    vus.....................................................................: 1      min=1          max=200
+    vus_max.................................................................: 200    min=200        max=200
+
+    NETWORK
+    data_received...........................................................: 5.2 MB 34 kB/s
+    data_sent...............................................................: 2.3 MB 15 kB/s
+
+
+
+
+running (2m32.2s), 000/200 VUs, 6535 complete and 0 interrupted iterations
+default ✓ [======================================] 000/200 VUs  2m30s
