@@ -1,24 +1,35 @@
 # Multi-Vendor Data Fetch Service
 
 This project is a robust, asynchronous data processing service designed to handle requests for multiple external data vendors. It abstracts away vendor-specific complexities like rate limiting and synchronous/asynchronous response patterns into a clean internal API.
-
-### Key Features
-* **Asynchronous Processing:** Immediately accepts jobs and processes them in the background using Redis Streams.
-* **Resilient and Scalable:** Containerized with Docker and designed with horizontally scalable workers.
-* **Safe Rate-Limiting:** A centralized, Redis-based token bucket implementation prevents breaking vendor rate limits.
-* **Dependency Healthchecks:** Uses Docker's native healthchecks to ensure services start in the correct order and are ready before accepting work.
-
----
-
-### Tech Stack
-* **Backend:** Django, Gunicorn
-* **Queue:** Redis Streams
-* **Database:** MongoDB
-* **Containerization:** Docker, Docker Compose
-* **Vendor Mocks:** FastAPI
-* **Load Testing:** k6
-
----
+### Tiny Architecture Diagram
+```
+                  +-------------------------+
+                  |         Client          |
+                  | (e.g., k6, Postman)     |
+                  +-------------------------+
+                           |
+                           | HTTP POST /jobs
+                           | HTTP GET /jobs/{id}
+                           v
++-------------------------------------------------------------------------------+
+| Docker Network                                                                |
+|   +----------------------+      +------------------+                          |
+|   |   API Service        |<---->|   Redis Queue    |<---+                     |
+|   |   (Django/Gunicorn)  |      |  (Redis Streams) |    | Read Job            |
+|   +---------+------------+      +------------------+    |                     |
+|             | read/write                                |                     |
+|             v                        +------------------+                     |
+|   +----------------------+           | Background Worker|                     |
+|   |      Database        |           |  (Python Script) |                     |
+|   |     (MongoDB)        |<----------+----+-------------+                     |
+|   +----------------------+                | Call Vendor (respects rate limit) |
+|             ^                             v                                   |
+|             | POST Webhook      +-----------------------+                     |
+|             +-------------------+ Mock Vendor Service   |                     |
+|                                 | (FastAPI)             |                     |
+|                                 +-----------------------+                     |
++-------------------------------------------------------------------------------+
+```
 
 ### Quick Start
 
@@ -82,3 +93,35 @@ This project is a robust, asynchronous data processing service designed to handl
             "result": { ... }
         }
         ```
+### Key Design Decisions & Trade-offs
+* **Queueing (Redis Streams):**
+
+    * **Decision:** Used Redis Streams for the job queue.
+
+    * **Reasoning:** It's lightweight, persistent, and has native support for consumer groups, which provides resilient, scalable workers out-of-the-box. This is a simpler alternative to RabbitMQ or Kafka for this project's scale.
+
+    * **Trade-off:** Lacks the advanced routing capabilities of RabbitMQ or the massive-scale log guarantees of Kafka, which were not required here.
+
+* **Service Readiness (Docker Healthchecks):**
+
+    * **Decision:** Used Docker Compose's built-in `healthcheck` feature to manage startup dependencies.
+
+    * **Reasoning:** This is more robust than a simple `depends_on`, as it actively polls services (e.g., the mock vendor) to ensure they are truly ready to accept traffic before dependent services (like the worker) start. This prevents common race conditions and DNS resolution errors.
+
+    * **Trade-off:** Adds a small amount of configuration complexity to `docker-compose.yml` but greatly increases startup reliability.
+
+* **Rate Limiting (Redis `SETNX`):**
+
+    * **Decision:** Implemented a Token Bucket algorithm using Redis's atomic `SET NX EX` command.
+
+    * **Reasoning:** This provides a centralized and highly efficient lock that functions correctly across multiple, distributed worker instances without needing complex application-level locking logic.
+
+    * **Trade-off:** Tightly couples the rate-limiting logic to Redis, but this is an acceptable trade-off since Redis is already a core dependency.
+
+* **Database Interaction (`pymongo` vs. ORM):**
+
+    * **Decision:** Used the `pymongo` library for direct interaction with MongoDB, bypassing the Django ORM.
+
+    * **Reasoning:** This decouples the core data logic from the Django framework, simplifies the worker (which doesn't need to be a full Django app), and is generally more performant for simple document storage.
+
+    * **Trade-off:** We lose the convenience of the Django Admin interface for directly viewing and managing jobs, which is an acceptable loss for a backend service like this.
